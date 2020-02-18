@@ -37,16 +37,18 @@ func main() {
 	if listFlag {
 		err = n.Print()
 	} else if editorFlag {
-		s := strings.Join(os.Args[2:], " ")
-		err = n.AddWithEditor(s)
+		err = n.AddWithEditor(strings.Join(os.Args[2:], " "))
 	} else {
-		s := strings.Join(os.Args[1:], " ")
-		err = n.Add(s)
+		err = n.Add(strings.Join(os.Args[1:], " "))
 	}
 
 	if err != nil {
-		fmt.Printf("Error: %s", err)
-		return
+		if err == notes.ErrEmptyNote {
+			flag.Usage()
+		} else {
+			fmt.Printf("Error: %s", err)
+			return
+		}
 	}
 
 	err = n.Store()

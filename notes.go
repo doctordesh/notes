@@ -1,12 +1,17 @@
 package notes
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
+	"strings"
 
 	"github.com/doctordesh/notes/logbook"
+)
+
+var (
+	ErrEmptyNote = errors.New("empty note not allowed")
 )
 
 type Notes interface {
@@ -16,6 +21,13 @@ type Notes interface {
 	Store() error
 }
 
+type notes struct {
+	output  io.Writer
+	logbook logbook.Logbook
+	printer Printer
+	editor  Editor
+}
+
 func New(file string, p Printer, e Editor) (Notes, error) {
 	n := notes{}
 	n.logbook = logbook.New()
@@ -23,7 +35,6 @@ func New(file string, p Printer, e Editor) (Notes, error) {
 	n.editor = e
 
 	if fileExists(file) {
-		log.Println("file existed. reading")
 		f, err := os.Open(file)
 		if err != nil {
 			return &n, fmt.Errorf("could not read file %s: %w", file, err)
@@ -43,33 +54,22 @@ func New(file string, p Printer, e Editor) (Notes, error) {
 		return &n, fmt.Errorf("could not create file %s: %w", file, err)
 	}
 
-	n.file = f
+	n.output = f
 
 	return &n, nil
 }
 
-type notes struct {
-	file    *os.File
-	logbook logbook.Logbook
-	printer Printer
-	editor  Editor
-}
-
 func (n *notes) Add(note string) error {
+	note = strings.TrimSpace(note)
+	if len(note) == 0 {
+		return ErrEmptyNote
+	}
 	err := n.logbook.Add(note)
 	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func fileExists(file string) bool {
-	info, err := os.Stat(file)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !info.IsDir()
 }
 
 func (n *notes) Print() error {
@@ -86,10 +86,18 @@ func (n *notes) AddWithEditor(note string) error {
 }
 
 func (n *notes) Store() error {
-	_, err := io.Copy(n.file, n.logbook)
+	_, err := io.Copy(n.output, n.logbook)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func fileExists(file string) bool {
+	info, err := os.Stat(file)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }
