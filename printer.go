@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/doctordesh/notes/logbook"
+	"github.com/eidolon/wordwrap"
 )
 
 type Printer interface {
@@ -38,12 +39,20 @@ func (p printer) Print(l logbook.Logbook) error {
 	}
 
 	s := ""
-
+	wrapper := wordwrap.Wrapper(100, false)
+	first := true
 	for _, day := range days {
-		s += fmt.Sprintf("%s\n\n", day.Date.Format("2006-01-02"))
+		if !first {
+			// Divider between days
+			s += "\n\n- - - - - - - \n"
+		}
+		first = false
+		s += fmt.Sprintf("\n%s\n", day.Date.Format("2006-01-02 - Monday"))
 
 		for _, entry := range day.Entries {
-			s += fmt.Sprintf("%s - %s\n", entry.Time.Format("15:04:05"), entry.Note)
+			timestamp := fmt.Sprintf("  %s - ", entry.Time.Format("15:04:05"))
+			note := wrapper(entry.Note)
+			s += wordwrap.Indent(note, timestamp, false) + "\n"
 		}
 	}
 
