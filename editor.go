@@ -9,6 +9,7 @@ import (
 
 type Editor interface {
 	Edit(note string) (string, error)
+	ManualEdit(filename string) error
 }
 
 type editor struct {
@@ -59,4 +60,18 @@ func (e editor) Edit(note string) (string, error) {
 
 	note = string(fileContent)
 	return note, nil
+}
+
+func (e editor) ManualEdit(filename string) error {
+	cmd := exec.Command(e.cmd, filename)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("could not manually edit file %w", err)
+	}
+
+	return nil
 }

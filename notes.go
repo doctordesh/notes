@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 
@@ -18,43 +19,40 @@ type Notes interface {
 	Add(note string) error
 	AddWithEditor(note string) error
 	Print() error
-	Store() error
+	ManualEdit() error
 }
 
 type notes struct {
-	output  io.Writer
-	logbook logbook.Logbook
-	printer Printer
-	editor  Editor
+	filename string
+	logbook  logbook.Logbook
+	printer  Printer
+	editor   Editor
+	tagger   Tagger
+
+	sizeOfOriginal int64
 }
 
-func New(file string, p Printer, e Editor) (Notes, error) {
+func New(filename string, p Printer, e Editor, t Tagger) (Notes, error) {
 	n := notes{}
 	n.logbook = logbook.New()
 	n.printer = p
 	n.editor = e
+	n.tagger = t
+	n.filename = filename
 
-	if fileExists(file) {
-		f, err := os.Open(file)
+	if fileExists(n.filename) {
+		f, err := os.Open(n.filename)
 		if err != nil {
-			return &n, fmt.Errorf("could not read file %s: %w", file, err)
+			return &n, fmt.Errorf("could not read file %s: %w", n.filename, err)
 		}
 
-		_, err = io.Copy(n.logbook, f)
+		w, err := io.Copy(n.logbook, f)
 		if err != nil {
 			return &n, fmt.Errorf("could not load from file: %w", err)
 		}
+
+		n.sizeOfOriginal = w
 	}
-
-	// Remove file
-	_ = os.Remove(file)
-
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
-	if err != nil {
-		return &n, fmt.Errorf("could not create file %s: %w", file, err)
-	}
-
-	n.output = f
 
 	return &n, nil
 }
@@ -64,7 +62,13 @@ func (n *notes) Add(note string) error {
 	if len(note) == 0 {
 		return ErrEmptyNote
 	}
-	err := n.logbook.Add(note)
+	tags := n.tagger.ScanTags()
+	err := n.logbook.Add(note, tags)
+	if err != nil {
+		return err
+	}
+
+	err = n.store()
 	if err != nil {
 		return err
 	}
@@ -82,11 +86,29 @@ func (n *notes) AddWithEditor(note string) error {
 		return err
 	}
 
-	return n.Add(note)
+	err = n.Add(note)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (n *notes) Store() error {
-	_, err := io.Copy(n.output, n.logbook)
+func (n *notes) ManualEdit() error {
+	return n.editor.ManualEdit(n.filename)
+}
+
+func (n *notes) store() error {
+	b, err := ioutil.ReadAll(n.logbook)
+	if err != nil {
+		return err
+	}
+
+	if int64(len(b)) <= n.sizeOfOriginal {
+		panic("New data is smaller than the data in the file. Wont save because of potential data loss")
+	}
+
+	err = ioutil.WriteFile(n.filename, b, 0644)
 	if err != nil {
 		return err
 	}

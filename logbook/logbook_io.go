@@ -8,7 +8,7 @@ import (
 
 func (l *logbook) Read(p []byte) (n int, err error) {
 	if l.readBuffer == nil {
-		b, err := json.Marshal(l)
+		b, err := json.MarshalIndent(l, "", "    ")
 		if err != nil {
 			return 0, err
 		}

@@ -5,7 +5,7 @@ import (
 )
 
 type Logbook interface {
-	Add(note string) error
+	Add(note string, tags []string) error
 	Read(p []byte) (n int, err error)
 	Write(p []byte) (n int, err error)
 	Entries() []Day
@@ -28,8 +28,8 @@ func (l *logbook) Entries() []Day {
 	return l.Days
 }
 
-func (l *logbook) Add(note string) error {
-	e := Entry{Time: time.Now(), Note: note}
+func (l *logbook) Add(note string, tags []string) error {
+	e := Entry{Time: time.Now(), Note: note, Tags: tags}
 	index := 0
 	found := false
 
